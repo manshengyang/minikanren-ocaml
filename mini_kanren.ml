@@ -187,6 +187,8 @@ let run n x f =
   let ss = take n (Func (fun () -> f (empty_s ()))) in
   List.map (fun s -> reify x s) ss
 
+let run_all = run (-1)
+
 let succeed s = Unit s
 let fail s = MZero
 
@@ -194,7 +196,7 @@ let _ =
   begin
     let q = (fresh ()) in
     let x = (fresh ()) in
-    let s = run 10 q [
+    let s = run_all q [
       conde [
         [succeed];
         [eq q (Constant (Bool true))];
