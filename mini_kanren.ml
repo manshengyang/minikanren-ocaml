@@ -31,6 +31,13 @@ let rec string_of_logic_term t =
           (string_of_logic_term hd)
           tl
 
+(* helper functions for using Constant *)
+let const_bool b = Constant (Bool b)
+let const_int i = Constant (Int i)
+let const_char c = Constant (Char c)
+let const_float f = Constant (Float f)
+let const_str s = Constant (String s)
+
 (* empty_s *)
 let empty_s () = Hashtbl.create 100
 
@@ -199,14 +206,14 @@ let _ =
     let s = run_all q [
       conde [
         [succeed];
-        [eq q (Constant (Bool true))];
+        [eq q (const_bool true)];
         [
-          (eq q (List [Constant (Bool true); Constant (Int 1); x]));
-          (eq x (Constant (Int 10)))
+          (eq q (List [(const_bool true); (const_int 1); x]));
+          (eq x (const_int 10))
         ];
         (let x = (fresh ()) in [eq q x]);
-        [(eq x q); (eq x (Constant (String "x")));];
-        [fail; (eq q (Constant (Int 1)))]
+        [(eq x q); (eq x (const_str "x"));];
+        [fail; (eq q (const_int 1))]
       ]
     ]
     in List.iter (fun t -> print_string ((string_of_logic_term t) ^ "\n")) s
