@@ -156,7 +156,7 @@ let eq u v a =
 
 (* We do not have exist construct,
  * the equivalent construct is:
- * let x = fresh () in all [...]
+ * let x = fresh () in [...]
  *)
 (* fresh: create a fresh variable *)
 let var_counter = ref 0
@@ -171,6 +171,7 @@ let all lst a = bind_all (Unit a) lst
 
 (* conde *)
 let conde lst s =
+  let lst = List.map all lst in
   Func (fun () -> mplus_all (List.map (fun f -> (f (Hashtbl.copy s))) lst))
 
 let rec take n a_inf =
@@ -182,6 +183,7 @@ let rec take n a_inf =
     | Unit a -> [a]
 
 let run n x f =
+  let f = all f in
   let ss = take n (Func (fun () -> f (empty_s ()))) in
   List.map (fun s -> reify x s) ss
 
@@ -192,16 +194,18 @@ let _ =
   begin
     let q = (fresh ()) in
     let x = (fresh ()) in
-    let s = run 10 q (
+    let s = run 10 q [
       conde [
-        succeed;
-        (eq q (Constant (Bool true)));
-        (all [
+        [succeed];
+        [eq q (Constant (Bool true))];
+        [
           (eq q (List [Constant (Bool true); Constant (Int 1); x]));
           (eq x (Constant (Int 10)))
-        ]);
-        (all [(eq x q); (eq x (Constant (String "x")));]);
-        (all [fail; (eq q (Constant (Int 1)))])
-    ])
+        ];
+        (let x = (fresh ()) in [eq q x]);
+        [(eq x q); (eq x (Constant (String "x")));];
+        [fail; (eq q (Constant (Int 1)))]
+      ]
+    ]
     in List.iter (fun t -> print_string ((string_of_logic_term t) ^ "\n")) s
   end
