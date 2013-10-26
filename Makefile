@@ -1,9 +1,8 @@
 native:
-	ocamlbuild mini_kanren.native
+	ocamlbuild ck.native
 
 byte:
-	ocamlbuild mini_kanren.byte
+	ocamlbuild ck.byte
 
 clean:
-	rm -rf *.native
-	rm -rf *.byte
+	rm -rf *.native *.byte _build

@@ -64,30 +64,30 @@ let rec occurs_check x v s =
       List.fold_left (fun checked v -> checked || (occurs_check x v s)) false lst
     | _ -> false
 
-(* ext_s_check *)
-let ext_s_check x v s =
-  if occurs_check x v s then None
-  else Some (ext_s x v s)
-
-(* unify_g: general unification function *)
-let rec unify_g ext_s u v s =
-  let u = walk u s in
-  let v = walk v s in
-  if u == v then Some s
-  else match (u, v) with
-    | (Var _, _) -> ext_s u v s
-    | (_, Var _) -> ext_s v u s
-    | (List ulst, List vlst) ->
-      List.fold_right2
-        (fun u v s -> match s with Some s -> (unify_g ext_s u v s) | _ -> None)
-        ulst vlst (Some s)
-    | _ -> if u = v then Some s else None
-
-(* unify_check *)
-let unify_check u v s = unify_g ext_s_check u v s
-
 (* unify *)
-let unify u v s = unify_g (fun x v s -> Some (ext_s x v s)) u v s
+let rec unify lst s =
+  match lst with
+  | [] -> Some s
+  | (u, v)::rest ->
+    let rec helper u v rest =
+      let u = walk u s in
+      let v = walk v s in
+      if u == v then unify rest s
+      else match (u, v) with
+        | Var _, _ ->
+          if occurs_check u v s then None
+          else unify rest (ext_s u v s)
+
+        | _, Var _ ->
+          if occurs_check v u s then None
+          else unify rest (ext_s v u s)
+
+        | List (u::ulst), List (v::vlst) ->
+          helper u v ((List.combine ulst vlst)@rest)
+
+        | _ ->
+          if u = v then (unify rest s) else None
+    in helper u v rest
 
 (* walk* *)
 let rec walk_all v s =
@@ -96,21 +96,16 @@ let rec walk_all v s =
     | List lst -> List (List.map (fun v -> walk_all v s) lst)
     | _ -> v
 
-(* reify_name *)
+(* reify-n *)
 let reify_name n = Constant (String ("_" ^ (string_of_int n)))
 
-(* reify_s *)
+(* reify-s *)
 let rec reify_s v s =
   let v = walk v s in
   match v with
     | Var _ -> ext_s v (reify_name (Hashtbl.length s)) s
     | List lst -> List.fold_right reify_s lst s
     | _ -> s
-
-(* reify *)
-let reify v s =
-  let v = walk_all v s in
-  walk_all v (reify_s v (empty_s ()))
 
 type 'a stream =
   | MZero
@@ -147,21 +142,7 @@ let rec bind_all e lst =
     | (_, []) -> e
     | (_, hd::tl) -> bind_all (bind e hd) tl
 
-(* =check *)
-let eq_check u v a =
-  let s = (unify_check u v a) in
-  match s with
-    | Some s -> Unit s
-    | None -> MZero
-
-(* = *)
-let eq u v a =
-  let s = (unify u v a) in
-  match s with
-    | Some s -> Unit s
-    | None -> MZero
-
-(* We do not have exist construct,
+(* We do not have exist/fresh construct,
  * the equivalent construct is:
  * let x = fresh () in [...]
  *)
@@ -181,6 +162,7 @@ let conde lst s =
   let lst = List.map all lst in
   Func (fun () -> mplus_all (List.map (fun f -> (f (Hashtbl.copy s))) lst))
 
+(* take *)
 let rec take n a_inf =
   if n = 0 then []
   else match a_inf with
@@ -188,33 +170,3 @@ let rec take n a_inf =
     | Func f -> (take n (f ()))
     | Choice (a, f) -> a::(take (n - 1) (f ()))
     | Unit a -> [a]
-
-let run n x f =
-  let f = all f in
-  let ss = take n (Func (fun () -> f (empty_s ()))) in
-  List.map (fun s -> reify x s) ss
-
-let run_all = run (-1)
-
-let succeed s = Unit s
-let fail s = MZero
-
-let _ =
-  begin
-    let q = (fresh ()) in
-    let x = (fresh ()) in
-    let s = run_all q [
-      conde [
-        [succeed];
-        [eq q (const_bool true)];
-        [
-          (eq q (List [(const_bool true); (const_int 1); x]));
-          (eq x (const_int 10))
-        ];
-        (let x = (fresh ()) in [eq q x]);
-        [(eq x q); (eq x (const_str "x"));];
-        [fail; (eq q (const_int 1))]
-      ]
-    ]
-    in List.iter (fun t -> print_string ((string_of_logic_term t) ^ "\n")) s
-  end
