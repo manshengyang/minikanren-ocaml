@@ -38,15 +38,19 @@ let const_char c = Constant (Char c)
 let const_float f = Constant (Float f)
 let const_str s = Constant (String s)
 
-(* empty_s *)
-let empty_s () = Hashtbl.create 100
+
+let empty_s = []
+let empty_d = []
+let empty_c = []
+let make_a s d c = (s, d, c)
+let empty_a = make_a empty_s empty_d empty_c
 
 (* walk *)
 let rec walk v s =
   match v with
     | Var _ ->
       begin
-        try walk (Hashtbl.find s v) s
+        try walk (List.assoc v s) s
         with Not_found -> v
       end
     | _ -> v
@@ -61,8 +65,7 @@ let rec occurs_check x v s =
     | _ -> false
 
 (* ext_s *)
-let ext_s x v s =
-  let _ = Hashtbl.add s x v in s
+let ext_s x v s = (x, v)::s
 
 (* ext_s_check: check for cycles before extending *)
 let ext_s_check x v s =
@@ -108,7 +111,7 @@ let reify_name n = Constant (String ("_" ^ (string_of_int n)))
 let rec reify_s v s =
   let v = walk v s in
   match v with
-    | Var _ -> ext_s v (reify_name (Hashtbl.length s)) s
+    | Var _ -> ext_s v (reify_name (List.length s)) s
     | List lst -> List.fold_right reify_s lst s
     | _ -> s
 
@@ -117,6 +120,8 @@ type 'a stream =
   | Func of (unit -> ('a stream))
   | Choice of 'a * (unit -> ('a stream))
   | Unit of 'a
+
+let empty_f () = MZero
 
 (* mplus *)
 let rec mplus a_inf f =
@@ -165,7 +170,7 @@ let all lst a = bind_all (Unit a) lst
 (* conde *)
 let conde lst s =
   let lst = List.map all lst in
-  Func (fun () -> mplus_all (List.map (fun f -> (f (Hashtbl.copy s))) lst))
+  Func (fun () -> mplus_all (List.map (fun f -> (f s)) lst))
 
 (* take *)
 let rec take n a_inf =
