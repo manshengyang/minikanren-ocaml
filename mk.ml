@@ -41,10 +41,6 @@ let const_str s = Constant (String s)
 (* empty_s *)
 let empty_s () = Hashtbl.create 100
 
-(* ext_s *)
-let ext_s x v s =
-  let _ = Hashtbl.add s x v in s
-
 (* walk *)
 let rec walk v s =
   match v with
@@ -63,6 +59,15 @@ let rec occurs_check x v s =
     | List lst ->
       List.fold_left (fun checked v -> checked || (occurs_check x v s)) false lst
     | _ -> false
+
+(* ext_s *)
+let ext_s x v s =
+  let _ = Hashtbl.add s x v in s
+
+(* ext_s_check: check for cycles before extending *)
+let ext_s_check x v s =
+  if occurs_check x v s then None
+  else Some (ext_s x v s)
 
 (* unify *)
 let rec unify lst s =
