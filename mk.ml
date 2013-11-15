@@ -199,7 +199,7 @@ let rec ifu lst =
         match a_inf with
           | MZero -> ifu tl
           | Func f -> Func (fun () -> helper (f ()))
-          | Choice _ | Unit _ -> bind_all a_inf glst
+          | Choice (a, _) | Unit a -> bind_all (Unit a) glst
       in helper e
 
 (* condu *)
