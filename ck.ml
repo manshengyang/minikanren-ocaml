@@ -63,15 +63,15 @@ let build_oc op terms = (op, terms)
 (* rem/run *)
 let rem_run oc a =
   let (s, d, c) = a in
-  if List.memq oc c then
-    let c2 = List.filter (fun x -> x != oc) c in
+  if List.mem oc c then
+    let c2 = List.filter (fun x -> x <> oc) c in
     (proc_of_oc oc) (make_a s d c2)
   else Some a
 
 (* any-relevant/var? *)
 let rec any_relevant_var t x =
   match t with
-    | Var _ -> List.memq t x
+    | Var _ -> List.mem t x
     | List ls ->
       List.exists (fun a -> any_relevant_var a x) ls
     | _ -> false
