@@ -69,11 +69,11 @@ let rem_run oc a =
   else Some a
 
 (* any-relevant/var? *)
-let any_relevant_var t x =
+let rec any_relevant_var t x =
   match t with
     | Var _ -> List.memq t x
     | List ls ->
-      List.exists (fun a -> List.memq a x) ls
+      List.exists (fun a -> any_relevant_var a x) ls
     | _ -> false
 
 let rec run_constraints x_all c =
