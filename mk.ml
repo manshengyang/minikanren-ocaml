@@ -14,11 +14,15 @@ let string_of_const_value v =
     | Char c -> Char.escaped c
     | Float f -> string_of_float f
 
+type var_id = int
+
 (* represent a logic term *)
 type logic_term =
-  | Var of int
+  | Var of var_id
   | Constant of const_value
   | List of (logic_term list)
+
+let is_var t = match t with Var _ -> true | _ -> false
 
 let rec string_of_logic_term t =
   match t with
@@ -39,9 +43,14 @@ let const_float f = Constant (Float f)
 let const_str s = Constant (String s)
 
 
-let empty_s = []
-let empty_d = []
-let empty_c = []
+type substitutions = (logic_term * logic_term) list
+type domains = (var_id * (int list)) list
+type constraints = (string * logic_term) list
+type store = substitutions * domains * constraints
+
+let empty_s : substitutions = []
+let empty_d : domains = []
+let empty_c : constraints = []
 let make_a s d c = (s, d, c)
 let empty_a = make_a empty_s empty_d empty_c
 
@@ -180,3 +189,23 @@ let rec take n a_inf =
     | Func f -> (take n (f ()))
     | Choice (a, f) -> a::(take (n - 1) (f ()))
     | Unit a -> [a]
+
+(* ifu *)
+let rec ifu lst =
+  match lst with
+    | [] -> MZero
+    | (e, glst)::tl ->
+      let rec helper a_inf =
+        match a_inf with
+          | MZero -> ifu tl
+          | Func f -> Func (fun () -> helper (f ()))
+          | Choice _ | Unit _ -> bind_all a_inf glst
+      in helper e
+
+(* condu *)
+let condu lst a =
+  Func (fun () ->
+    ifu (List.map (fun l -> ((List.hd l) a, List.tl l)) lst))
+
+(* onceo *)
+let onceo g = condu [g]

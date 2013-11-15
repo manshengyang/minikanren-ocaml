@@ -1,85 +1,92 @@
 open Mk
 
-let unitg s = Unit s
-let mzerog s = MZero
+let op_map = Hashtbl.create 100
+let get_op (op : string) : (logic_term -> store -> store option) =
+  Hashtbl.find op_map op
+let add_op = Hashtbl.replace op_map
 
 (* identitym *)
 let identitym a = Some a
 
 (* composem *)
 let composem f g a =
-  let b = f a in b && g b
+  match f a with
+    | None -> None
+    | Some b -> g b
 
 (* goal-construct *)
 let goal_construct f a =
   match f a with
-  | None -> MZero
-  | Some x -> Unit x
+    | None -> MZero
+    | Some x -> Unit x
 
 (* process-prefix *)
-let process_prefix = (fun p c -> identitym)
+let process_prefix = ref (fun p c a -> identitym a)
 (* enforce-constraints*)
-let enforce_constraints = (fun x -> unitg)
+let enforce_constraints = ref (fun x a -> Unit a)
 (* reify-constraints*)
-let reify_constraints = (fun m r a -> Unit m)
+let reify_constraints = ref (fun m r a -> Unit m)
 
 (* oc->proc *)
-let proc_of_oc (x, _, _) = x
+let proc_of_oc (x, args) = get_op x args
 (* oc->rands *)
-let rands_of_oc (_, x, _) = x
-(* oc->rator *)
-let rator_of_oc (_, _, x) = x
+let rands_of_oc (_, x) = x
 
 (* any/var? *)
 let rec any_var p =
   match p with
     | Var _ -> true
-    | List lst -> List.exists any_var lst
+    | List ls -> List.exists any_var ls
     | _ -> false
 
 (* ext-d *)
-let ext_d x fd d = (x, fd)::d
+let ext_d x fd d : domains = (x, fd)::d
 
 (* ext-c *)
-let ext_c oc c =
+let ext_c oc c : constraints =
   if any_var (rands_of_oc oc) then oc::c
   else c
 
-(* prefix-s *)
-let prefix_s s s2 =
-  if s = [] then s2
-  else
-    let rec helper s2 =
-      if s2 = s then []
-      else match s2 with
-      | hd::tl -> hd::(helper tl)
-      | [] -> []
-    in helper s2
+type constraint_op = logic_term -> store -> (store option)
+let constraint_op2 f ls a =
+  match ls with
+  | List [u; v] -> f u v a
+  | _ -> failwith "number of operands is not 2"
+let constraint_op3 f ls a =
+  match ls with
+  | List [u; v; w] -> f u v w a
+  | _ -> failwith "number of operands is not 3"
 
-(* ==-c *)
-let eq_c u v (s, d, c) =
-  match unify [(u, v)] s with
-    | Some s2 ->
-      if s = s2 then Some (s, d, c)
-      else
-        let p = prefix_s s s2 in
-        let a = make_a s2 d c in
-        (process_prefix p c) a
-    | None -> None
+(* build-oc *)
+let build_oc op terms = (op, terms)
 
-(* == *)
-let eq u v = goal_construct (eq_c u v)
+(* rem/run *)
+let rem_run oc a =
+  let (s, d, c) = a in
+  if List.memq oc c then
+    let c2 = List.filter (fun x -> x != oc) c in
+    (proc_of_oc oc) (make_a s d c2)
+  else Some a
 
-(*
-let succeed s = eq (const_bool false) (const_bool false)
-let fail s = eq (const_bool true) (const_bool false)
-*)
-let succeed s = Unit s
-let fail s = MZero
+(* any-relevant/var? *)
+let any_relevant_var t x =
+  match t with
+    | Var _ -> List.memq t x
+    | List ls ->
+      List.exists (fun a -> List.memq a x) ls
+    | _ -> false
+
+let rec run_constraints x_all c =
+  match c with
+  | [] -> identitym
+  | hd::tl ->
+    if any_relevant_var (rands_of_oc hd) x_all then
+      (composem (rem_run hd) (run_constraints x_all tl))
+    else (run_constraints x_all tl)
 
 (* reify *)
 let reify (x : logic_term) a =
-  let a2 = bind a (enforce_constraints x) in
+  let a2 = bind a (!enforce_constraints x) in
   let helper a =
     let (s, d, c) = a in
     let v = walk_all x s in
@@ -88,7 +95,7 @@ let reify (x : logic_term) a =
     else
       let v = walk_all v r in
       if c = [] then Unit v
-      else (reify_constraints v r) a
+      else (!reify_constraints v r) a
   in bind a2 helper
 
 (* run *)
@@ -99,22 +106,38 @@ let run n x f =
 (* run* *)
 let run_all x f = run (-1) x f
 
-let _ =
-  begin
-    let q = (fresh ()) in
-    let x = (fresh ()) in
-    let s = run_all q [
-      conde [
-        [succeed];
-        [eq q (const_bool true)];
-        [
-          (eq q (List [(const_bool true); (const_int 1); x]));
-          (eq x (const_int 10))
-        ];
-        (let x = (fresh ()) in [eq q x]);
-        [(eq x q); (eq x (const_str "x"));];
-        [fail; (eq q (const_int 1))]
-      ]
-    ]
-    in List.iter (fun t -> print_string ((string_of_logic_term t) ^ "\n")) s
-  end
+
+(* prefix-s *)
+let prefix_s s s2 =
+  if s = [] then s2
+  else
+    let rec helper s2 =
+      if s2 = s then []
+      else match s2 with
+        | hd::tl -> hd::(helper tl)
+        | [] -> []
+    in helper s2
+
+(* ==-c *)
+let eq_c : constraint_op =
+  let helper u v a =
+    let (s, d, c) = a in
+    match unify [(u, v)] s with
+      | Some s2 ->
+        if s = s2 then Some (s, d, c)
+        else
+          let p = prefix_s s s2 in
+          let a = make_a s2 d c in
+          (!process_prefix p c) a
+      | None -> None
+  in constraint_op2 helper
+
+(* == *)
+let eq u v = goal_construct (eq_c (List [u; v]))
+
+(*
+let succeed = eq (const_bool false) (const_bool false)
+let fail = eq (const_bool true) (const_bool false)
+*)
+let succeed a = Unit a
+let fail a = MZero

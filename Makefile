@@ -1,11 +1,11 @@
 native:
-	ocamlbuild ck.native
+	ocamlbuild main.native
 
 byte:
-	ocamlbuild ck.byte
+	ocamlbuild main.byte
 
 debug:
-	ocamlbuild ck.d.byte
+	ocamlbuild main.d.byte
 
 clean:
 	rm -rf *.native *.byte _build
