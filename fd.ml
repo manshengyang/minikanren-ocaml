@@ -148,28 +148,31 @@ let get_walk_dom u (s, d, _) =
   | Constant (Int i) -> (u, Some (make_dom [i]))
   | _ -> (u, None)
 
-let neq_fd_c : constraint_op =
+(* =/=fd-c *)
+let neqfd_c : constraint_op =
   let helper u v a =
     let (u, udom) = get_walk_dom u a in
     let (v, vdom) = get_walk_dom v a in
     let (s, d, c) = a in
-    let oc = build_oc "neq_fd" (List [u; v]) in
+    let oc = build_oc "=/=fd" (List [u; v]) in
     match (udom, vdom) with
       | (Some udom, Some vdom) ->
         if (singleton_dom udom) && (singleton_dom vdom) && udom = vdom then
           None
         else if disjoint_dom udom vdom then
           Some a
-        else let a = make_a s d (ext_c oc c) in
-        if singleton_dom udom then
-          process_dom v (diff_dom vdom udom) a
-        else if singleton_dom vdom then
-          process_dom u (diff_dom udom vdom) a
-        else Some a
+        else
+          let a = make_a s d (ext_c oc c) in
+          if singleton_dom udom then
+            process_dom v (diff_dom vdom udom) a
+          else if singleton_dom vdom then
+            process_dom u (diff_dom udom vdom) a
+          else Some a
       | _ -> Some (make_a s d (ext_c oc c))
   in constraint_op2 helper
 
 let exclude_from_dom dom1 d x_all =
+  let x_all = List.map logic_term_to_var x_all in
   let rec helper x_all =
     match x_all with
       | [] -> identitym
@@ -182,6 +185,7 @@ let exclude_from_dom dom1 d x_all =
   in helper x_all
 
 
+(* all-diff/fd-c *)
 let all_diff_fd_c : constraint_op =
   let helper y_all n_all a =
     let (s, d, c) = a in
@@ -191,13 +195,13 @@ let all_diff_fd_c : constraint_op =
       let n_val_all = List.map logic_term_to_int nls in
       match yls with
         | [] ->
-          let oc = build_oc "all_diff_fd" (List [y_all; n_all]) in
+          let oc = build_oc "all-diff/fd" (List [List x_all; n_all]) in
           let a = make_a s d (ext_c oc c) in
           exclude_from_dom (make_dom n_val_all) d x_all a
         | yhd::ytl ->
           let y = walk yhd s in
           match y with
-            | Var i -> loop (List ytl) n_all (i::x_all)
+            | Var _ -> loop (List ytl) n_all (y::x_all)
             | Constant (Int i) ->
               if mem_dom i n_val_all then None
               else
@@ -208,27 +212,29 @@ let all_diff_fd_c : constraint_op =
     in loop y_all n_all []
   in constraint_op2 helper
 
+(* all-difffd-c *)
 let all_difffd_c ls a =
   let (s, d, c) = a in
   let ls = walk ls s in
   match ls with
     | Var _ ->
-      let oc = build_oc "all_difffd" ls in
+      let oc = build_oc "all-difffd" ls in
       Some (make_a s d (ext_c oc c))
     | List ls ->
       let (x_all, n_all) = List.partition is_var ls in
-      let n_all = List.sort compare (List.map logic_term_to_int n_all) in
-      if list_sorted (<) n_all then (* all_diff n_all *)
-        let n_all = List.map const_int n_all in
+      let n_val_all = List.sort compare (List.map logic_term_to_int n_all) in
+      if list_sorted (<) n_val_all then (* all_diff n_all *)
+        let n_all = List.map const_int n_val_all in
         all_diff_fd_c (List [(List x_all); (List n_all)]) a
       else None
     | _ -> Some a
 
-let rec process_prefix_fd p c =
+(* process-prefixfd *)
+let rec process_prefixfd p c =
   match p with
     | [] -> identitym
     | (x, v)::tl ->
-      let t = composem (run_constraints [x] c) (process_prefix_fd tl c) in
+      let t = composem (run_constraints [x] c) (process_prefixfd tl c) in
       fun a ->
         let (s, d, c) = a in
         match get_dom (logic_term_to_var x) d with
@@ -248,8 +254,8 @@ let rec verify_all_bound c bounds =
           (string_of_logic_term x))
       with _ -> verify_all_bound tl bounds
 
-
-let enforce_constraints_fd x =
+(* enfore-constraintsfd *)
+let enforce_constraintsfd x =
   all [
     force_ans x;
     (fun a ->
@@ -259,9 +265,11 @@ let enforce_constraints_fd x =
       onceo [force_ans (List bounds)] a)
   ]
 
-let reify_constraints_fd m r =
+(* reify-constraintsfd *)
+let reify_constraintsfd m r =
   failwith "Unbound vars at end"
 
+(* c-op *)
 let c_op op ls f a =
   let get_val d =
     match d with
@@ -276,10 +284,10 @@ let c_op op ls f a =
   else f vls (List.map get_val domls) a
 
 (* <=fd-c *)
-let le_fd_c : constraint_op =
+let lefd_c : constraint_op =
   let f vls domls =
     match (vls, domls) with
-      | ([v; u], [vdom; udom]) ->
+      | ([u; v], [udom; vdom]) ->
         let umin = min_dom udom in
         let vmax = max_dom vdom in
           composem
@@ -289,10 +297,11 @@ let le_fd_c : constraint_op =
   in let helper u v a = c_op "<=fd" [u; v] f a
   in constraint_op2 helper
 
-let plus_fd_c : constraint_op =
+(* +fd-c *)
+let plusfd_c : constraint_op =
   let f vls domls =
     match (vls, domls) with
-      | ([v; u; w], [vdom; udom; wdom]) ->
+      | ([u; v; w], [udom; vdom; wdom]) ->
         let wmin = min_dom wdom in
         let wmax = max_dom wdom in
         let umin = min_dom udom in
@@ -304,7 +313,7 @@ let plus_fd_c : constraint_op =
           (composem
             (process_dom u (range (wmin - vmax) (wmax - vmin)))
             (process_dom v (range (wmin - umax) (wmax - umin))))
-    | _ -> failwith "invalid args" (* should never happens*)
+      | _ -> failwith "invalid args" (* should never happens*)
   in let helper u v w a = c_op "+fd" [u; v; w] f a
   in constraint_op3 helper
 
@@ -321,26 +330,27 @@ let infd ls e =
   all (List.map (fun x -> domfd x e) ls)
 
 (* =/=fd: (neqfd x y) *)
-let neqfd u v = goal_construct (neq_fd_c (List [u; v]))
+let neqfd u v = goal_construct (neqfd_c (List [u; v]))
 
 (* <=fd: (lefd x y) *)
-let lefd u v = goal_construct (le_fd_c (List [u; v]))
-
-(* +fd: (plusfd x y sum) *)
-let plusfd u v w = goal_construct (plus_fd_c (List [u; v; w]))
+let lefd u v = goal_construct (lefd_c (List [u; v]))
 
 (* <fd: (ltfd x y) *)
 let ltfd u v = all [lefd u v; neqfd u v]
 
+(* +fd: (plusfd x y sum) *)
+let plusfd u v w = goal_construct (plusfd_c (List [u; v; w]))
+
 (* all-difffd: (all_difffd ls) *)
 let all_difffd ls = goal_construct (all_difffd_c ls)
 
-
 let use_fd () =
-  let _ = add_op "neq-fd" neq_fd_c in
-  let _ = add_op "all_difffd" all_difffd_c in
-  let _ = add_op "all_diff_fd" all_diff_fd_c in
-  let _ = process_prefix := process_prefix_fd in
-  let _ = enforce_constraints := enforce_constraints_fd in
-  let _ = reify_constraints := reify_constraints_fd in
+  let _ = add_op "=/=fd" neqfd_c in
+  let _ = add_op "all-difffd" all_difffd_c in
+  let _ = add_op "all-diff/fd" all_diff_fd_c in
+  let _ = add_op "<=fd" lefd_c in
+  let _ = add_op "+fd" plusfd_c in
+  let _ = process_prefix := process_prefixfd in
+  let _ = enforce_constraints := enforce_constraintsfd in
+  let _ = reify_constraints := reify_constraintsfd in
   ()
