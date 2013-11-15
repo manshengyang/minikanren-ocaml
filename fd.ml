@@ -127,18 +127,17 @@ let process_dom v dom a =
 let rec force_ans (x : logic_term) (a : store) =
   let (s, d, c) = a in
   let x = walk x s in
-  let f =
-    match x with
-      | Var v ->
-        begin
-          match get_dom v d with
-            | Some ls ->
-              map_sum (fun v -> (eq x (const_int v))) ls
-            | None -> succeed
-        end
-      | List ls ->
-        all (List.map force_ans ls)
-      | _ -> succeed
+  let f = match x with
+    | Var v ->
+      begin
+        match get_dom v d with
+          | Some ls ->
+            map_sum (fun v -> (eq x (const_int v))) ls
+          | None -> succeed
+      end
+    | List ls ->
+      all (List.map force_ans ls)
+    | _ -> succeed
   in f a
 
 let get_walk_dom u (s, d, _) =
@@ -179,7 +178,8 @@ let exclude_from_dom dom1 d x_all =
       | xhd::xtl ->
         match get_dom xhd d with
           | Some dom2 ->
-            composem (process_dom (Var xhd) (diff_dom dom2 dom1))
+            composem
+              (process_dom (Var xhd) (diff_dom dom2 dom1))
               (helper xtl)
           | None -> helper xtl
   in helper x_all
@@ -189,25 +189,25 @@ let exclude_from_dom dom1 d x_all =
 let all_diff_fd_c : constraint_op =
   let helper y_all n_all a =
     let (s, d, c) = a in
-    let rec loop y_all n_all x_all =
+    let rec loop y_all n_all xls =
       let yls = logic_term_to_list y_all in
       let nls = logic_term_to_list n_all in
       let n_val_all = List.map logic_term_to_int nls in
       match yls with
         | [] ->
-          let oc = build_oc "all-diff/fd" (List [List x_all; n_all]) in
+          let oc = build_oc "all-diff/fd" (List [List xls; n_all]) in
           let a = make_a s d (ext_c oc c) in
-          exclude_from_dom (make_dom n_val_all) d x_all a
+          exclude_from_dom (make_dom n_val_all) d xls a
         | yhd::ytl ->
           let y = walk yhd s in
           match y with
-            | Var _ -> loop (List ytl) n_all (y::x_all)
+            | Var _ -> loop (List ytl) n_all (y::xls)
             | Constant (Int i) ->
               if mem_dom i n_val_all then None
               else
                 let n_val_all = list_insert (<) i n_val_all in
                 let nls = List.map const_int n_val_all in
-                loop (List ytl) (List nls) x_all
+                loop (List ytl) (List nls) xls
             | _ -> None
     in loop y_all n_all []
   in constraint_op2 helper

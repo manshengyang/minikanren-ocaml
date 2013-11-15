@@ -77,10 +77,10 @@ let _ = test "all_difffd" (fun q ->
   let y = fresh () in
   let z = fresh () in
   [
-    eq q (List [x; y; z]);
-    infd [x] (range 1 3);
+    eq q (List [x; y]);
+    infd [x] (range 1 2);
     infd [y] (range 1 2);
     infd [z] (range 1 1);
-    all_difffd q
+    all_difffd q;
   ]
 ) print_s

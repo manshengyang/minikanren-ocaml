@@ -24,17 +24,6 @@ type logic_term =
 
 let is_var t = match t with Var _ -> true | _ -> false
 
-let rec string_of_logic_term t =
-  match t with
-    | Var i -> "var_" ^ string_of_int i
-    | Constant v -> string_of_const_value v
-    | List [] -> ""
-    | List (hd::tl) ->
-        List.fold_left
-          (fun str t -> str ^ ", " ^ (string_of_logic_term t))
-          (string_of_logic_term hd)
-          tl
-
 (* helper functions for using Constant *)
 let const_bool b = Constant (Bool b)
 let const_int i = Constant (Int i)
@@ -54,6 +43,16 @@ let empty_c : constraints = []
 let make_a s d c = (s, d, c)
 let empty_a = make_a empty_s empty_d empty_c
 
+let rec string_of_logic_term t =
+  match t with
+    | Var i -> "var_" ^ string_of_int i
+    | Constant v -> string_of_const_value v
+    | List l ->
+      "(" ^ (String.concat ", " (List.map string_of_logic_term l)) ^ ")"
+
+let string_of_constraint (x, l) =
+  Printf.sprintf "(%s, %s" x (string_of_logic_term l)
+
 (* walk *)
 let rec walk v s =
   match v with
@@ -70,7 +69,7 @@ let rec occurs_check x v s =
   match v with
     | Var _ -> v = x
     | List lst ->
-      List.fold_left (fun checked v -> checked || (occurs_check x v s)) false lst
+      List.exists (fun v -> occurs_check x v s) lst
     | _ -> false
 
 (* ext_s *)
