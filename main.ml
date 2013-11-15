@@ -114,3 +114,46 @@ let _ = test "send-more-money" (fun letters ->
     add_digits n r c0 c1 e;
     add_digits d e (const_int 0) c0 y;
   ])
+
+let diag qi qj d rng =
+  let qi_d = fresh () in
+  let qj_d = fresh () in
+  all [
+    infd [qi_d; qj_d] rng;
+    plusfd qi d qi_d;
+    neqfd qi_d qj;
+    plusfd qj d qj_d;
+    neqfd qj_d qi;
+  ]
+
+let diagonals n r =
+  let rec helper r i s j =
+    match r with
+      | [] | [_] -> succeed
+      | qi::(y::rtl) ->
+        match s with
+          | [] -> helper (y::rtl) (i + 1) rtl (i + 2)
+          | qj::stl ->
+            all [
+              diag qi qj (const_int (j - i)) (range 0 (2 * n));
+              helper r i stl (j + 1)
+            ]
+  in helper r 0 (List.tl r) 1
+
+let n_queens q n =
+  let rec helper i l =
+    if i = 0 then
+      all [
+        all_difffd (List l);
+        diagonals n l;
+        eq q (List l);
+      ]
+    else
+      let x = fresh () in
+      all [
+        infd [x] (range 1 n);
+        helper (i - 1) (x::l)
+      ]
+  in helper n []
+
+let _ = test ~limit:5 "eight-queens" (fun q -> [n_queens q 8])
