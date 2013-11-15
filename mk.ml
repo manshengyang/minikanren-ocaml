@@ -51,7 +51,7 @@ let rec string_of_logic_term t =
       "(" ^ (String.concat ", " (List.map string_of_logic_term l)) ^ ")"
 
 let string_of_constraint (x, l) =
-  Printf.sprintf "(%s, %s" x (string_of_logic_term l)
+  Printf.sprintf "(%s, %s)" x (string_of_logic_term l)
 
 (* walk *)
 let rec walk v s =
@@ -171,6 +171,10 @@ let fresh () =
     var_counter := !var_counter + 1;
     Var !var_counter
   end
+
+let rec fresh_n n =
+  if n <= 0 then []
+  else (fresh ())::(fresh_n (n - 1))
 
 (* all: combine a sequence (list) of clauses *)
 let all lst a = bind_all (Unit a) lst

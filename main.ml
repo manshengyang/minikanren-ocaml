@@ -1,5 +1,3 @@
-(* TODO List.memq/==/!= correct? *)
-
 open Mk
 open Ck
 open Fd
@@ -9,11 +7,11 @@ let print_sep name =
 
 let print_s = List.iter (fun t -> print_string ((string_of_logic_term t) ^ "\n"))
 
-let test name f print =
+let test ?limit:(limit = -1) name f =
   let _ = print_sep name in
   let q = fresh () in
-  let s = run_all q (f q) in
-  print s
+  let s = run limit q (f q) in
+  print_s s
 
 let _ = test "miniKanren" (fun q ->
   let x = fresh () in
@@ -30,12 +28,12 @@ let _ = test "miniKanren" (fun q ->
       [fail; eq q (const_int 1)]
     ]
   ]
-) print_s
+)
 
 
 let _ = use_fd ()
 
-let _ = test "infd" (fun q -> [infd [q] [1; 2; 3]]) print_s
+let _ = test "infd" (fun q -> [infd [q] [1; 2; 3]])
 
 let _ = test "neqfd" (fun q ->
   let x = fresh () in
@@ -45,8 +43,7 @@ let _ = test "neqfd" (fun q ->
     infd [y] (range 1 3);
     neqfd x y;
     eq q (List [x; y])
-  ]
-) print_s
+  ])
 
 let _ = test "lefd" (fun q ->
   let x = fresh () in
@@ -56,8 +53,7 @@ let _ = test "lefd" (fun q ->
     infd [y] (make_dom [1; 2; 3]);
     lefd x y;
     eq q (List [x; y])
-  ]
-) print_s
+  ])
 
 let _ = test "plusfd" (fun q ->
   let x = fresh () in
@@ -69,18 +65,52 @@ let _ = test "plusfd" (fun q ->
     infd [z] (range 5 6);
     plusfd x y z;
     eq q (List [x; y; z])
-  ]
-) print_s
+  ])
 
 let _ = test "all_difffd" (fun q ->
   let x = fresh () in
   let y = fresh () in
   let z = fresh () in
   [
-    eq q (List [x; y]);
-    infd [x] (range 1 2);
+    eq q (List [x; y; z]);
+    infd [x] (range 1 3);
     infd [y] (range 1 2);
     infd [z] (range 1 1);
     all_difffd q;
+  ])
+
+let add_digits aug add cin cout digit =
+  let par_sum = fresh () in
+  let sum = fresh () in
+  all [
+    domfd par_sum (range 0 18);
+    domfd sum (range 0 19);
+    plusfd aug add par_sum;
+    plusfd par_sum cin sum;
+    conde [
+      [
+        ltfd (const_int 9) sum;
+        eq cout (const_int 1);
+        plusfd digit (const_int 10) sum
+      ];
+      [
+        lefd sum (const_int 9);
+        eq cout (const_int 0);
+        eq digit sum
+      ]
+    ]
   ]
-) print_s
+
+let _ = test "send-more-money" (fun letters ->
+  let [s; e; n; d; m; o; r; y; c0; c1; c2] = fresh_n 11 in
+  [
+    eq letters (List [s; e; n; d; m; o; r; y]);
+    all_difffd letters;
+    infd [s; m] (range 1 9);
+    infd [e; n; d; o; r; y] (range 0 9);
+    infd [c0; c1; c2] (range 0 1);
+    add_digits s m c2 m o;
+    add_digits e o c1 c2 n;
+    add_digits n r c0 c1 e;
+    add_digits d e (const_int 0) c0 y;
+  ])
