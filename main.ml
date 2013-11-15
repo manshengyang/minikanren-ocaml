@@ -39,30 +39,36 @@ let _ = test "infd" (fun q -> [infd [q] [1; 2; 3]]) print_s
 
 let _ = test "neqfd" (fun q ->
   let x = fresh () in
+  let y = fresh () in
   [
-    infd [q] [2; 3; 4];
-    infd [x] [1; 2; 3];
-    neqfd q x
+    infd [x] (range 2 4);
+    infd [y] (range 1 3);
+    neqfd x y;
+    eq q (List [x; y])
   ]
 ) print_s
 
 let _ = test "lefd" (fun q ->
   let x = fresh () in
+  let y = fresh () in
   [
-    infd [q] [2; 3; 4];
-    infd [x] [1; 2; 3];
-    lefd q x
+    infd [x] (make_dom [2; 3; 4]);
+    infd [y] (make_dom [1; 2; 3]);
+    lefd x y;
+    eq q (List [x; y])
   ]
 ) print_s
 
 let _ = test "plusfd" (fun q ->
   let x = fresh () in
   let y = fresh () in
+  let z = fresh () in
   [
-    infd [q] (range 2 8);
-    infd [x] (range 1 3);
-    infd [y] [5];
-    plusfd q x y
+    infd [x] (range 2 8);
+    infd [y] (range 1 3);
+    infd [z] (range 5 6);
+    plusfd x y z;
+    eq q (List [x; y; z])
   ]
 ) print_s
 
