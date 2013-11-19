@@ -101,19 +101,23 @@ let add_digits aug add cin cout digit =
     ]
   ]
 
-let _ = test "send-more-money" (fun letters ->
-  let [s; e; n; d; m; o; r; y; c0; c1; c2] = fresh_n 11 in
-  [
-    eq letters (List [s; e; n; d; m; o; r; y]);
-    all_difffd letters;
-    infd [s; m] (range 1 9);
-    infd [e; n; d; o; r; y] (range 0 9);
-    infd [c0; c1; c2] (range 0 1);
-    add_digits s m c2 m o;
-    add_digits e o c1 c2 n;
-    add_digits n r c0 c1 e;
-    add_digits d e (const_int 0) c0 y;
-  ])
+let _ = test "send-more-money"(fun letters ->
+  match fresh_n 11 with
+  | [s; e; n; d; m; o; r; y; c0; c1; c2] ->
+     [
+       eq letters (List [s; e; n; d; m; o; r; y]);
+       all_difffd letters;
+       infd [s; m] (range 1 9);
+       infd [e; n; d; o; r; y] (range 0 9);
+       infd [c0; c1; c2] (range 0 1);
+       add_digits s m c2 m o;
+       add_digits e o c1 c2 n;
+       add_digits n r c0 c1 e;
+       add_digits d e (const_int 0) c0 y;
+     ]
+  | _ -> failwith "Fresh_n failed"
+)
+         
 
 let diag qi qj d rng =
   let qi_d = fresh () in
