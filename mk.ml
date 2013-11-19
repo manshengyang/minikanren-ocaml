@@ -21,6 +21,7 @@ type logic_term =
   | Var of var_id
   | Constant of const_value
   | List of (logic_term list)
+  | Cons of logic_term * logic_term
 
 let is_var t = match t with Var _ -> true | _ -> false
 
@@ -47,6 +48,8 @@ let rec string_of_logic_term t =
   match t with
     | Var i -> "var_" ^ string_of_int i
     | Constant v -> string_of_const_value v
+    | Cons (a, b) ->
+        "(" ^ (string_of_logic_term a) ^ ", " ^ (string_of_logic_term b) ^ ")"
     | List l ->
       "(" ^ (String.concat ", " (List.map string_of_logic_term l)) ^ ")"
 
@@ -68,6 +71,8 @@ let rec occurs_check x v s =
   let v = walk v s in
   match v with
     | Var _ -> v = x
+    | Cons (a, b) ->
+      (occurs_check x a s) && (occurs_check x b s)
     | List lst ->
       List.exists (fun v -> occurs_check x v s) lst
     | _ -> false
@@ -101,6 +106,9 @@ let rec unify lst s =
         | List (u::ulst), List (v::vlst) ->
           helper u v ((List.combine ulst vlst)@rest)
 
+        | Cons (a1, b1), Cons (a2, b2) ->
+          helper a1 a2 ((b1, b2)::rest)
+
         | _ ->
           if u = v then (unify rest s) else None
     in helper u v rest
@@ -109,6 +117,7 @@ let rec unify lst s =
 let rec walk_all v s =
   let v = walk v s in
   match v with
+    | Cons (a, b) -> Cons (walk_all a s, walk_all b s)
     | List lst -> List (List.map (fun v -> walk_all v s) lst)
     | _ -> v
 
@@ -120,6 +129,7 @@ let rec reify_s v s =
   let v = walk v s in
   match v with
     | Var _ -> ext_s v (reify_name (List.length s)) s
+    | Cons (a, b) -> reify_s b (reify_s a s)
     | List lst -> List.fold_right reify_s lst s
     | _ -> s
 

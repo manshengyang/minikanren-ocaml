@@ -36,6 +36,7 @@ let rands_of_oc (_, x) = x
 let rec any_var p =
   match p with
     | Var _ -> true
+    | Cons (a, b) -> (any_var a) && (any_var b)
     | List ls -> List.exists any_var ls
     | _ -> false
 
@@ -72,6 +73,7 @@ let rem_run oc a =
 let rec any_relevant_var t x =
   match t with
     | Var _ -> List.mem t x
+    | Cons (a, b) -> (any_relevant_var a x) && (any_relevant_var b x)
     | List ls ->
       List.exists (fun a -> any_relevant_var a x) ls
     | _ -> false
