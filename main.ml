@@ -157,3 +157,35 @@ let n_queens q n =
   in helper n []
 
 let _ = test ~limit:5 "eight-queens" (fun q -> [n_queens q 8])
+
+let rec appendo l s out =
+  conde [
+    [eq l (List []); eq s out];
+    [
+      fun ss ->
+        let a, d = fresh (), fresh () in
+        all [
+          eq (Cons (a, d)) l;
+          (fun ss ->
+            let res = fresh () in
+            all [
+              eq (Cons (a, res)) out;
+              appendo d s res;
+            ] ss)
+        ] ss
+    ]
+  ]
+
+let l =
+  (Cons ((const_int 1),
+    (Cons ((const_int 2),
+      (Cons ((const_int 3),
+        (Cons ((const_int 4), List []))))))))
+
+let _ = test ~limit:5 "appendo" (fun q ->
+  let a, b = fresh (), fresh () in
+  [
+    appendo a b l;
+    eq q (Cons (a, b))
+  ]
+)
