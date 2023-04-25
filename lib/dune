@@ -1,0 +1,16 @@
+(library
+ (name minikanren)
+ (modules mk fd ck)
+ (libraries
+ eio_main
+  ;GT
+  )
+ ;  (instrumentation
+ ;   (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_inline_test
+   ;bisect_ppx
+   ;GT.ppx_all
+   ))
+ (inline_tests))

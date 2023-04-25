@@ -1,0 +1,8 @@
+(executable
+ (name u)
+ (libraries minikanren)
+ (preprocess
+  (pps ppx_inline_test)))
+
+(cram
+ (deps ./u.exe))

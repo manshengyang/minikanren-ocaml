@@ -21,11 +21,11 @@ let goal_construct f a =
     | Some x -> Unit x
 
 (* process-prefix *)
-let process_prefix = ref (fun p c a -> identitym a)
+let process_prefix = ref (fun _ _ a -> identitym a)
 (* enforce-constraints*)
-let enforce_constraints = ref (fun x a -> Unit a)
+let enforce_constraints = ref (fun _ a -> Unit a)
 (* reify-constraints*)
-let reify_constraints = ref (fun m r a -> Unit m)
+let reify_constraints = ref (fun m _ _ -> Unit m)
 
 (* oc->proc *)
 let proc_of_oc (x, args) = get_op x args
@@ -91,7 +91,7 @@ let rec run_constraints x_all c =
 let reify (x : logic_term) a =
   let a2 = bind a (!enforce_constraints x) in
   let helper a =
-    let (s, d, c) = a in
+    let (s, _, c) = a in
     let v = walk_all x s in
     let r = reify_s v empty_s in
     if r = [] then Unit v
@@ -143,4 +143,4 @@ let succeed = eq (const_bool false) (const_bool false)
 let fail = eq (const_bool true) (const_bool false)
 *)
 let succeed a = Unit a
-let fail a = MZero
+let fail _ = MZero

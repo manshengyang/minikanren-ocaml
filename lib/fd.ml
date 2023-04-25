@@ -108,7 +108,7 @@ let resolve_storable_dom dom x (s, d, c) =
     Some (make_a s (ext_d x dom d) c)
 
 let update_var_dom x dom a =
-  let (s, d, c) = a in
+  let (_, d, _) = a in
   match get_dom x d with
   | Some xdom ->
     let i = intersection_dom xdom dom in
@@ -125,7 +125,7 @@ let process_dom v dom a =
     | _ -> None
 
 let rec force_ans (x : logic_term) (a : store) =
-  let (s, d, c) = a in
+  let (s, d, _) = a in
   let x = walk x s in
   let f = match x with
     | Var v ->
@@ -236,7 +236,7 @@ let rec process_prefixfd p c =
     | (x, v)::tl ->
       let t = composem (run_constraints [x] c) (process_prefixfd tl c) in
       fun a ->
-        let (s, d, c) = a in
+        let (_, d, _) = a in
         match get_dom (logic_term_to_var x) d with
           | Some dom ->
             composem (process_dom v dom) t a
@@ -259,14 +259,14 @@ let enforce_constraintsfd x =
   all [
     force_ans x;
     (fun a ->
-      let (s, d, c) = a in
+      let (_, d, c) = a in
       let bounds = List.map (fun x -> Var x) (List.map fst d) in
       let _ = verify_all_bound c bounds in
       onceo [force_ans (List bounds)] a)
   ]
 
 (* reify-constraintsfd *)
-let reify_constraintsfd m r =
+let reify_constraintsfd _ _ =
   failwith "Unbound vars at end"
 
 (* c-op *)
