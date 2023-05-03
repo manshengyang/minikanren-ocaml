@@ -203,28 +203,15 @@ let condePar lst s =
   let c = Chan.make_unbounded() in
   let rec force_func f = 
     match f with
-    | Func f -> force_func (f())
-    | Choice (x, f) -> 
-      Chan.send c x;
-      force_func (f());
-    | Unit x ->
-      Chan.send c x;
-    | MZero -> ()
+    | Func f -> force_func (f () )
+    | _ -> f
     in
-  let rec merge_streams c = 
-    match Chan.recv_poll c with 
-    | Some x ->
-      mplus (Unit x) (fun () -> merge_streams c)
-    | None -> MZero
-  in
   let make_task_list lst = 
     List.map (fun f -> Task.async pool (fun _ -> force_func (f s))) lst
   in
   let lst = List.map all lst in
-  Task.run pool (fun () -> List.iter (fun x -> Task.await pool x) (make_task_list lst));
   Func (fun () -> 
-    (* Task.run pool (fun () -> List.iter (fun x -> Task.await pool x) (make_task_list lst)); *)
-    merge_streams c
+    Task.run pool (fun () -> mplus_all (List.map (fun x -> Task.await pool x) (make_task_list lst)))
     )
   (*
   - сделать take 1 из каждой ветки? но в таком случае непонятно как брать остальные  
