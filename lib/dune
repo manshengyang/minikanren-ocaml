@@ -3,6 +3,7 @@
  (modules mk fd ck)
  (libraries
  eio_main
+ domainslib
   ;GT
   )
  ;  (instrumentation

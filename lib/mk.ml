@@ -1,3 +1,5 @@
+open Domainslib
+
 (* represent a constant value *)
 type const_value =
   | Bool of bool
@@ -189,10 +191,54 @@ let rec fresh_n n =
 (* all: combine a sequence (list) of clauses *)
 let all lst a = bind_all (Unit a) lst
 
+
+
+let pool = Task.setup_pool ~num_domains:12 ()
 (* conde *)
-let conde lst s =
+let conde lst s = 
   let lst = List.map all lst in
   Func (fun () -> mplus_all (List.map (fun f -> (f s)) lst))
+
+let condePar lst s = 
+  let c = Chan.make_unbounded() in
+  let rec force_func f = 
+    match f with
+    | Func f -> force_func (f())
+    | Choice (x, f) -> 
+      Chan.send c x;
+      force_func (f());
+    | Unit x ->
+      Chan.send c x;
+    | MZero -> ()
+    in
+  let rec merge_streams c = 
+    match Chan.recv_poll c with 
+    | Some x ->
+      mplus (Unit x) (fun () -> merge_streams c)
+    | None -> MZero
+  in
+  let make_task_list lst = 
+    List.map (fun f -> Task.async pool (fun _ -> force_func (f s))) lst
+  in
+  let lst = List.map all lst in
+  Task.run pool (fun () -> List.iter (fun x -> Task.await pool x) (make_task_list lst));
+  Func (fun () -> 
+    (* Task.run pool (fun () -> List.iter (fun x -> Task.await pool x) (make_task_list lst)); *)
+    merge_streams c
+    )
+  (*
+  - сделать take 1 из каждой ветки? но в таком случае непонятно как брать остальные  
+  - зафорсировать каждый в разном домене так, чтобы они остановились на Choice (a, f) или Unit или Zero.
+  1. проблема в том, что какая-то ветка может быть бесконечно вычисляемой, а мы ее зря зафорсировали.
+ 2. а куда потом эти Choice отправятся? и где ждать вычисления? тут же?
+ 3. ответы ведь в любом случае нужно мержить последовательно? тогда идея тупо в чан кидать не прокатит, лучше по порядку await
+ или мы предполагаем, что неважно в каком порядке записаны ветки (а это влияет на производительность)
+
+ в версии юниканрена это форсировалось до конца, но я не уверена что это норм
+         | Stream.Cons (x, y) ->
+          Chan.send c x;
+          force_stream (Lazy.force y)
+  *)
 
 (* take *)
 let rec take n a_inf =

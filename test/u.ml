@@ -15,157 +15,6 @@ let test ?limit:(limit = -1) name f =
   print_string (Printf.sprintf "Execution time: %f\n" (Sys.time() -. time));
   print_s s
 
-let _ = test "miniKanren" (fun q ->
-  let x = fresh () in
-  [
-    conde [
-      [succeed];
-      [eq q (const_bool true)];
-      [
-        eq q (List [const_bool true; const_int 1; x]);
-        eq x (const_int 10)
-      ];
-      (let x = fresh () in [eq q x]);
-      [eq x q; eq x (const_str "x");];
-      [fail; eq q (const_int 1)]
-    ]
-  ]
-)
-
-
-let _ = use_fd ()
-
-let _ = test "infd" (fun q -> [infd [q] [1; 2; 3]])
-
-let _ = test "neqfd" (fun q ->
-  let x = fresh () in
-  let y = fresh () in
-  [
-    infd [x] (range 2 4);
-    infd [y] (range 1 3);
-    neqfd x y;
-    eq q (List [x; y])
-  ])
-
-let _ = test "lefd" (fun q ->
-  let x = fresh () in
-  let y = fresh () in
-  [
-    infd [x] (make_dom [2; 3; 4]);
-    infd [y] (make_dom [1; 2; 3]);
-    lefd x y;
-    eq q (List [x; y])
-  ])
-
-let _ = test "plusfd" (fun q ->
-  let x = fresh () in
-  let y = fresh () in
-  let z = fresh () in
-  [
-    infd [x] (range 2 8);
-    infd [y] (range 1 3);
-    infd [z] (range 5 6);
-    plusfd x y z;
-    eq q (List [x; y; z])
-  ])
-
-let _ = test "all_difffd" (fun q ->
-  let x = fresh () in
-  let y = fresh () in
-  let z = fresh () in
-  [
-    eq q (List [x; y; z]);
-    infd [x] (range 1 3);
-    infd [y] (range 1 2);
-    infd [z] (range 1 1);
-    all_difffd q;
-  ])
-
-let add_digits aug add cin cout digit =
-  let par_sum = fresh () in
-  let sum = fresh () in
-  all [
-    domfd par_sum (range 0 18);
-    domfd sum (range 0 19);
-    plusfd aug add par_sum;
-    plusfd par_sum cin sum;
-    conde [
-      [
-        ltfd (const_int 9) sum;
-        eq cout (const_int 1);
-        plusfd digit (const_int 10) sum
-      ];
-      [
-        lefd sum (const_int 9);
-        eq cout (const_int 0);
-        eq digit sum
-      ]
-    ]
-  ]
-
-let _ = test "send-more-money"(fun letters ->
-  match fresh_n 11 with
-  | [s; e; n; d; m; o; r; y; c0; c1; c2] ->
-     [
-       eq letters (List [s; e; n; d; m; o; r; y]);
-       all_difffd letters;
-       infd [s; m] (range 1 9);
-       infd [e; n; d; o; r; y] (range 0 9);
-       infd [c0; c1; c2] (range 0 1);
-       add_digits s m c2 m o;
-       add_digits e o c1 c2 n;
-       add_digits n r c0 c1 e;
-       add_digits d e (const_int 0) c0 y;
-     ]
-  | _ -> failwith "Fresh_n failed"
-)
-         
-
-let diag qi qj d rng =
-  let qi_d = fresh () in
-  let qj_d = fresh () in
-  all [
-    infd [qi_d; qj_d] rng;
-    plusfd qi d qi_d;
-    neqfd qi_d qj;
-    plusfd qj d qj_d;
-    neqfd qj_d qi;
-  ]
-
-let diagonals n r =
-  let rec helper r i s j =
-    match r with
-      | [] | [_] -> succeed
-      | qi::(y::rtl) ->
-        match s with
-          | [] -> helper (y::rtl) (i + 1) rtl (i + 2)
-          | qj::stl ->
-            all [
-              diag qi qj (const_int (j - i)) (range 0 (2 * n));
-              helper r i stl (j + 1)
-            ]
-  in helper r 0 (List.tl r) 1
-
-let n_queens q n =
-  let rec helper i l =
-    if i = 0 then
-      all [
-        all_difffd (List l);
-        diagonals n l;
-        eq q (List l);
-      ]
-    else
-      let x = fresh () in
-      all [
-        infd [x] (range 1 n);
-        helper (i - 1) (x::l)
-      ]
-  in helper n []
-
-let _ = test ~limit:5 "eight-queens" (fun q -> [n_queens q 8])
-
-
-
 let rec appendo l s out : 'a -> 'a stream =
   conde [
     [eq l (List []); eq s out];
@@ -190,6 +39,8 @@ let l =
       (Cons ((const_int 3),
         (Cons ((const_int 4), List []))))))))
 
+let _lst len sym = List.fold_right (fun _ acc -> Cons (const_char sym , acc)) (List.init len (fun _ -> sym )) (List [])
+
 let _ = 
   test ~limit:5 "appendo" (fun q ->
   let a, b = fresh (), fresh () in
@@ -198,8 +49,6 @@ let _ =
     eq q (Cons (a, b))
   ]
 )
-
-
 
 let rec reverso xy yx = 
   conde [
@@ -222,8 +71,46 @@ let rec reverso xy yx =
     ]
   ]
 
-let _ = test ~limit:2 "reverso" (fun q -> [reverso q l])
+let task_2rev q = [conde [[reverso (_lst 150 'x') q]; [reverso (_lst 150 'a') q]]]
+let task_2rev_par q = [condePar [[reverso (_lst 150 'x') q]; [reverso (_lst 150 'a') q]]]
+
+
+let _ = test ~limit:(5) "reverso" (fun q -> task_2rev q)
+
+
+let _ = test ~limit:(5) "reverso-parallel" (fun q -> task_2rev_par q)
+
+
+
+
 (* 
+let _ = Eio_main.run @@ fun env ->
+  test ~limit:(-1) "2reverso with domain manager" 
+  (fun q -> [conde ~mgr:(Eio.Stdenv.domain_mgr env) [[reverso (_lst 10 'x') q]; [reverso (_lst 10 'x') q]]])  *)
+
+
+(* ----------------------- external attempt 
+
+
+let _paraltest ~domain_mgr q = 
+  let term1 = Eio.Domain_manager.run domain_mgr (fun () -> reverso (_lst 50 'x') q) in
+  let term2 = Eio.Domain_manager.run domain_mgr (fun () -> reverso (_lst 50 'x') q) in
+  [conde [[term1]; [term2]]]
+
+let _nonparaltest ~domain_mgr q = [
+conde [
+  [reverso (_lst 100 'x') q];
+  [reverso (_lst 100 'x') q]
+]
+]
+let _ = Eio_main.run @@ fun env ->
+  test ~limit:(-1) "reverso paral" (fun q -> _paraltest ~domain_mgr:(Eio.Stdenv.domain_mgr env) q)
+*)
+
+
+(* --------------------------- interleaving
+
+
 let rec anyo t = 
   conde [
     [t];
@@ -242,5 +129,4 @@ let _ = test ~limit:10 "interleaving with anyo" (fun q ->
       ])
     )
 ]) *)
-
 

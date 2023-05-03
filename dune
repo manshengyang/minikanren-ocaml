@@ -1,0 +1,8 @@
+(env
+ (dev
+  (flags
+   (:standard
+    -warn-error
+    -9-26-33-39-27-32
+    ;-w -9
+    ))))
