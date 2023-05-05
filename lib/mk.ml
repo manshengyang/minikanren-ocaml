@@ -199,6 +199,25 @@ let conde lst s =
   let lst = List.map all lst in
   Func (fun () -> mplus_all (List.map (fun f -> (f s)) lst))
 
+
+(* mplus with forcing. assume that f is not () -> g and already has answers *)
+(*
+еще вариант -- тут f запускать в другом потоке   
+*)
+let rec mplus_par a_inf f =
+  match a_inf with
+    | MZero -> f
+    | Func f2 -> mplus_par f (f2())
+    | Unit a -> Choice (a, fun () -> f)
+    | Choice (a, f2) -> Choice (a, (fun () -> mplus (f) f2))
+
+(* mplus_all with forcing *)
+let rec mplus_all_par lst =
+  match lst with
+    | hd::tl -> mplus_par hd (mplus_all_par tl)
+    | [] -> MZero
+
+
 let condePar lst s = 
   let c = Chan.make_unbounded() in
   let rec force_func f = 
@@ -211,7 +230,7 @@ let condePar lst s =
   in
   let lst = List.map all lst in
   Func (fun () -> 
-    Task.run pool (fun () -> mplus_all (List.map (fun x -> Task.await pool x) (make_task_list lst)))
+    Task.run pool (fun () -> mplus_all_par (List.map (fun x -> Task.await pool x) (make_task_list lst)))
     )
   (*
   - сделать take 1 из каждой ветки? но в таком случае непонятно как брать остальные  
